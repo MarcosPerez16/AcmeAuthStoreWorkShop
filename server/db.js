@@ -5,7 +5,7 @@ const client = new pg.Client(
 const uuid = require("uuid");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const JWT = process.env.JWT || "coding";
+const JWT_SECRET = process.env.JWT_SECRET || "coding";
 
 const createTables = async () => {
   const SQL = `
@@ -81,7 +81,7 @@ const authenticate = async ({ username, password }) => {
   }
 
   // Sign a JWT token
-  const token = jwt.sign({ id: response.rows[0].id }, JWT);
+  const token = jwt.sign({ id: response.rows[0].id }, JWT_SECRET);
   return { token };
 };
 
@@ -135,6 +135,18 @@ const fetchFavorites = async (user_id) => {
   return response.rows;
 };
 
+const registerUser = async ({ username, password }) => {
+  const SQL = `
+    INSERT INTO users(id, username, password) VALUES($1, $2, $3) RETURNING *
+  `;
+  const response = await client.query(SQL, [
+    uuid.v4(),
+    username,
+    await bcrypt.hash(password, 5),
+  ]);
+  return response.rows[0];
+};
+
 module.exports = {
   client,
   createTables,
@@ -147,4 +159,5 @@ module.exports = {
   destroyFavorite,
   authenticate,
   findUserWithToken,
+  registerUser,
 };

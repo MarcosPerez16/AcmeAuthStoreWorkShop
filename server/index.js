@@ -10,6 +10,7 @@ const {
   destroyFavorite,
   authenticate,
   findUserWithToken,
+  registerUser,
 } = require("./db");
 
 const jwt = require("jsonwebtoken");
@@ -18,6 +19,17 @@ const JWT_SECRET = process.env.JWT_SECRET || "coding";
 const express = require("express");
 const app = express();
 app.use(express.json());
+
+const isLoggedIn = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization;
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.user = await findUserWithToken(payload.id);
+    next();
+  } catch (ex) {
+    next(ex);
+  }
+};
 
 //for deployment only
 const path = require("path");
@@ -53,7 +65,7 @@ app.get("/api/users", async (req, res, next) => {
   }
 });
 
-app.get("/api/users/:id/favorites", async (req, res, next) => {
+app.get("/api/users/:id/favorites", isLoggedIn, async (req, res, next) => {
   try {
     res.send(await fetchFavorites(req.params.id));
   } catch (ex) {
@@ -61,7 +73,7 @@ app.get("/api/users/:id/favorites", async (req, res, next) => {
   }
 });
 
-app.post("/api/users/:id/favorites", async (req, res, next) => {
+app.post("/api/users/:id/favorites", isLoggedIn, async (req, res, next) => {
   try {
     res.status(201).send(
       await createFavorite({
@@ -74,14 +86,18 @@ app.post("/api/users/:id/favorites", async (req, res, next) => {
   }
 });
 
-app.delete("/api/users/:user_id/favorites/:id", async (req, res, next) => {
-  try {
-    await destroyFavorite({ user_id: req.params.user_id, id: req.params.id });
-    res.sendStatus(204);
-  } catch (ex) {
-    next(ex);
+app.delete(
+  "/api/users/:user_id/favorites/:id",
+  isLoggedIn,
+  async (req, res, next) => {
+    try {
+      await destroyFavorite({ user_id: req.params.user_id, id: req.params.id });
+      res.sendStatus(204);
+    } catch (ex) {
+      next(ex);
+    }
   }
-});
+);
 
 app.get("/api/products", async (req, res, next) => {
   try {
@@ -96,6 +112,14 @@ app.use((err, req, res, next) => {
   res
     .status(err.status || 500)
     .send({ error: err.message ? err.message : err });
+});
+
+app.post("/api/auth/register", async (req, res, next) => {
+  try {
+    res.send(await registerUser(req.body));
+  } catch (ex) {
+    next(ex);
+  }
 });
 
 const init = async () => {
